@@ -1,0 +1,166 @@
+---
+title: "Question2"
+author: "Soumyadip Mitra"
+date: "8/1/2020"
+output: html_document
+---
+
+
+## Is there any relationship between the amount of time spent working with individual clients (time to complete an assessment, time to complete resume, # of logged activities, etc.) and how quickly they are employed? 
+– Contact+Hire+Act+Feedback+Q1+Q4+Q5–
+(date calculation) – Mitra
+
+This can be derived variable - 
+Days_to_get_hired = Date_Turned_Blue__c - Date_turned_green__c
+
+these are 2 intervals we need to use - 
+
+Days_between_Assigned_and_Assessed = Dat_Initial_Assessment_was_Completed__c - Date_assigned_to_staff__c)
+
+Days_between_Assessment_and_Resume = Date_Resume_Completed__c - Dat_Initial_Assessment_was_Completed__c
+
+## Read the Data
+```{r message=FALSE, warning=FALSE}
+#library(readr)
+df1 <- read.csv('Contact+Hire+Act+Feedback+Q1+Q4+Q5.csv')
+```
+
+## Format the date fields
+```{r}
+#df1$c_CreatedDate <- as.Date(df1$c_CreatedDate, format = "%m/%d/%y %I:%M:%S %p")
+library(lubridate)
+df1$c_Date_Turned_Blue__c <- date(mdy_hm(df1$c_Date_Turned_Blue__c))
+df1$c_Date_turned_green__c <- date(mdy_hm(df1$c_Date_turned_green__c))
+df1$c_Dat_Initial_Assessment_was_Completed__c <- date(mdy_hm(df1$c_Dat_Initial_Assessment_was_Completed__c))
+df1$c_Date_assigned_to_staff__c <- date(mdy_hm(df1$c_Date_assigned_to_staff__c))
+df1$c_Date_Resume_Completed__c <- date(mdy_hm(df1$c_Date_Resume_Completed__c))
+```
+
+## Select the formatted date columns in a subset and examine them
+```{r}
+myDF <- subset(df1, select = c(
+  c_Date_Turned_Blue__c,
+  c_Date_turned_green__c,
+  c_Dat_Initial_Assessment_was_Completed__c,
+  c_Date_assigned_to_staff__c,
+  c_Date_Resume_Completed__c
+  ))
+# Empty the original dataset as its not required any more
+df1 <- NULL
+str(myDF)
+```
+
+## Examine the data sample
+```{r}
+head(myDF)
+```
+
+
+## Create 
+- Days_to_get_hired = Date_Turned_Blue__c - Date_turned_green__c
+- Days_between_Assigned_and_Assessed = c_Dat_Initial_Assessment_was_Completed__c - c_Date_assigned_to_staff__c
+- Days_between_Assessment_and_Resume = c_Date_Resume_Completed__c - c_Dat_Initial_Assessment_was_Completed__c
+- Time_spent_on_clients = Days_between_Assigned_and_Assessed + Days_between_Assessment_and_Resume
+```{r}
+library(dplyr)
+myDF <- myDF %>% 
+  mutate(Days_to_get_hired = c_Date_Turned_Blue__c - c_Date_turned_green__c) %>%
+  mutate(Days_between_Assigned_and_Assessed = 
+           c_Dat_Initial_Assessment_was_Completed__c - c_Date_assigned_to_staff__c) %>%
+  mutate(Days_between_Assessment_and_Resume = 
+           c_Date_Resume_Completed__c - c_Dat_Initial_Assessment_was_Completed__c) %>%
+  mutate (Time_spent_on_clients = Days_between_Assigned_and_Assessed + Days_between_Assessment_and_Resume)
+head(myDF)
+```
+
+
+## Keep the fields required
+```{r}
+finalDf <- subset(myDF, select = c(
+  Days_to_get_hired,
+  #Days_between_Assigned_and_Assessed,
+  #Days_between_Assessment_and_Resume,
+  Time_spent_on_clients
+  ))
+head(finalDf)
+```
+
+
+## Check the range of the two variables
+```{r}
+finalDf$Days_to_get_hired <- as.integer(finalDf$Days_to_get_hired)
+finalDf$Time_spent_on_clients <- as.integer(finalDf$Time_spent_on_clients)
+summary(finalDf)
+#starwars %>% filter(mass > mean(mass, na.rm = TRUE))
+```
+
+
+## Remove rows with negative, zero and missing values
+```{r}
+finalDf <- finalDf %>% 
+  filter(Days_to_get_hired > 0) %>%
+  filter(Time_spent_on_clients > 0)
+summary(finalDf)
+
+```
+
+
+## Boxplot before removing outliers
+```{r}
+library(ggplot2)
+library(plotly)
+bp <- finalDf %>% 
+  ggplot(aes(x=1,y=Days_to_get_hired)) +
+  geom_boxplot() +
+  theme_minimal()
+ggplotly(bp)
+```
+
+
+## Remove outliers
+```{r}
+finalDf <- finalDf %>% 
+  filter(Days_to_get_hired < (1.5*(218-63))) %>%
+  filter(Time_spent_on_clients < (1.5*(10-2)))
+summary(finalDf)
+```
+
+## Boxplot after removing outliers
+```{r}
+bp <- finalDf %>% 
+  ggplot(aes(x=1,y=Days_to_get_hired)) +
+  geom_boxplot() +
+  theme_minimal()
+ggplotly(bp)
+```
+
+
+## Histogram of Days_to_get_hired
+```{r}
+ht <- finalDf %>%
+  ggplot(aes(x=Days_to_get_hired)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white") +
+  geom_density(fill="blue",alpha=0.3) + 
+  theme_minimal()
+ggplotly(ht)
+```
+
+## Plot the Time Spent on Clients vs Time to get hired with a Linear Regression Line
+```{r}
+p <- finalDf %>%
+  ggplot(aes(x=Time_spent_on_clients,y=Days_to_get_hired)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  theme_minimal()
+p
+```
+
+
+
+## Linear Model Statistics
+```{r}
+model <- lm(Days_to_get_hired ~ Time_spent_on_clients, data=finalDf)
+summary(model)
+```
+
+
